@@ -1,8 +1,8 @@
 pipeline:
   name: AIDLC Demo Inception
   identifier: AIDLC_Demo_Inception
-  projectIdentifier: aidlc_claude_reference
-  orgIdentifier: sandbox
+  projectIdentifier: YOUR_PROJECT_ID
+  orgIdentifier: YOUR_ORG_ID
   tags:
     aidlc: inception
     agent: claude

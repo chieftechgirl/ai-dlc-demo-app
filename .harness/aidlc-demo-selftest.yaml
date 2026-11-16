@@ -1,8 +1,8 @@
 pipeline:
   name: AIDLC Demo Self Test
   identifier: AIDLC_Demo_Self_Test
-  projectIdentifier: aidlc_claude_reference
-  orgIdentifier: sandbox
+  projectIdentifier: YOUR_PROJECT_ID
+  orgIdentifier: YOUR_ORG_ID
   tags:
     purpose: selftest
   description: Tests the AI-DLC governance logic. No model key and no repo needed.

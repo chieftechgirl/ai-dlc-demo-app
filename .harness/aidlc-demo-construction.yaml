@@ -1,8 +1,8 @@
 pipeline:
   name: AIDLC Demo Construction
   identifier: AIDLC_Demo_Construction
-  projectIdentifier: aidlc_claude_reference
-  orgIdentifier: sandbox
+  projectIdentifier: YOUR_PROJECT_ID
+  orgIdentifier: YOUR_ORG_ID
   tags:
     aidlc: construction
     agent: claude

@@ -42,6 +42,20 @@ flowchart LR
 | Construction | Yes | Pipeline 2, runs only after approval |
 | Operations | No | Not in these pipelines |
 
+## Bring your own accounts
+
+Nothing here is tied to a specific Harness project or cloud account. You supply:
+
+| You bring | Used for |
+|-----------|----------|
+| A coding tool: Kiro, Cursor or Claude Code | Running AWS's AI-DLC interactively |
+| Model access: an Anthropic API key, or your own AWS account with Amazon Bedrock | The model behind AI-DLC |
+| A Harness account (org and project) | Pipelines with enforced approvals, policy, tests, scan and deploy |
+| A GitHub account | Your fork, the review branches and the GitHub Pages site |
+
+Start with **[docs/SETUP.md](docs/SETUP.md)**. It walks through each layer, and `scripts/setup_harness.py` fills your
+org and project into the pipeline templates (`--provider bedrock` switches them to your AWS account).
+
 ## Use your own AI coding tool (Kiro, Cursor, Claude Code)
 
 AI-DLC is one core that runs natively in several tools. The Harness pipelines use Claude Code in CI; at your
