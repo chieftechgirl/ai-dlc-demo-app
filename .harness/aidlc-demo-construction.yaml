@@ -1,0 +1,226 @@
+pipeline:
+  name: AIDLC Demo Construction
+  identifier: AIDLC_Demo_Construction
+  projectIdentifier: aidlc_claude_reference
+  orgIdentifier: sandbox
+  tags:
+    aidlc: construction
+    agent: claude
+  properties:
+    ci:
+      codebase:
+        connectorRef: <+input>
+        repoName: <+input>
+        build: <+input>   # point at the approved aidlc/<execution id> branch
+  variables:
+    - name: intent
+      type: String
+      description: Same intent text used in Inception
+      value: <+input>
+    - name: aidlc_profile
+      type: String
+      value: express
+    - name: inception_execution_id
+      type: String
+      description: Execution id of the approved Inception run (branch is aidlc/<id>)
+      value: <+input>
+  stages:
+    - stage:
+        name: Verify Gate
+        identifier: Verify_Gate
+        description: Refuse to build unless Inception evidence exists and was approved.
+        type: CI
+        spec:
+          cloneCodebase: true
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Cloud
+            spec: {}
+          execution:
+            steps:
+              - step:
+                  type: Run
+                  name: Check Evidence
+                  identifier: Check_Evidence
+                  spec:
+                    shell: Bash
+                    command: |-
+                      git fetch origin "aidlc/<+pipeline.variables.inception_execution_id>"
+                      git checkout "aidlc/<+pipeline.variables.inception_execution_id>"
+                      # The Harness approval is the gate of record; the repo must also show the
+                      # approved artifacts. Require at least one approval event in the audit trail.
+                      python3 scripts/aidlc-gate-check.py --phase construction --min-approvals 1 --enforce --out aidlc-evidence.json
+                      export evidence_json="$(python3 -c 'import json;print(json.dumps(json.load(open("aidlc-evidence.json"))))')"
+                    outputVariables:
+                      - name: evidence_json
+                        type: String
+                        value: evidence_json
+    - stage:
+        name: Evidence Policy
+        identifier: Evidence_Policy
+        description: Policy steps run in a Custom stage. Evaluates the evidence JSON against the aidlc_evidence_gate policy set.
+        type: Custom
+        spec:
+          execution:
+            steps:
+              - step:
+                  type: Policy
+                  name: AIDLC Evidence Policy
+                  identifier: AIDLC_Evidence_Policy
+                  spec:
+                    policySets:
+                      - aidlc_evidence_gate
+                    type: Custom
+                    policySpec:
+                      payload: <+pipeline.stages.Verify_Gate.spec.execution.steps.Check_Evidence.output.outputVariables.evidence_json>
+                  timeout: 10m
+    - stage:
+        name: Construction with Claude
+        identifier: Construction_with_Claude
+        type: CI
+        spec:
+          cloneCodebase: true
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Cloud
+            spec: {}
+          execution:
+            steps:
+              - step:
+                  type: Run
+                  name: Setup Claude Code and AI-DLC
+                  identifier: Setup_Claude_AIDLC
+                  spec:
+                    shell: Bash
+                    command: |-
+                      git fetch origin "aidlc/<+pipeline.variables.inception_execution_id>"
+                      git checkout "aidlc/<+pipeline.variables.inception_execution_id>"
+                      bash scripts/setup-claude.sh
+              - step:
+                  type: Run
+                  name: Run Construction
+                  identifier: Run_Construction
+                  spec:
+                    shell: Bash
+                    envVariables:
+                      ANTHROPIC_API_KEY: <+secrets.getValue("anthropic_api_key")>
+                      AIDLC_PROFILE: <+pipeline.variables.aidlc_profile>
+                    command: bash scripts/run-aidlc-headless.sh construction "<+pipeline.variables.intent>"
+                  timeout: 60m
+              - step:
+                  type: Run
+                  name: Build and Test
+                  identifier: Build_and_Test
+                  spec:
+                    shell: Bash
+                    command: |-
+                      set -euo pipefail
+                      python3 --version
+                      python3 -m unittest discover -s tests -v
+              - step:
+                  type: Run
+                  name: Security Scan
+                  identifier: Security_Scan
+                  spec:
+                    shell: Bash
+                    command: |-
+                      set -euo pipefail
+                      # Secret scan of the AI-generated change. Swap for a Harness STO step when available.
+                      curl -fsSL -o gitleaks.tgz https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_x64.tar.gz
+                      tar -xzf gitleaks.tgz gitleaks
+                      ./gitleaks detect --source . --no-git --redact --verbose
+              - step:
+                  type: Run
+                  name: Publish Build To Review Branch
+                  identifier: Publish_Build
+                  spec:
+                    shell: Bash
+                    envVariables:
+                      GIT_TOKEN: <+secrets.getValue("git_push_token")>
+                    command: |-
+                      set -euo pipefail
+                      git config user.name "aidlc-bot"
+                      git config user.email "aidlc-bot@example.com"
+                      git add -A -- . ':!gitleaks' ':!gitleaks.tgz' ':!aidlc-*-run.log'
+                      git commit -m "AI-DLC construction output (inception execution <+pipeline.variables.inception_execution_id>)" || echo "nothing new to commit"
+                      git push "https://x-access-token:${GIT_TOKEN}@$(git remote get-url origin | sed 's#https://##')" "HEAD:aidlc/<+pipeline.variables.inception_execution_id>"
+              - step:
+                  type: Run
+                  name: Notify AI DLC Insights
+                  identifier: Notify_AIDI
+                  spec:
+                    shell: Bash
+                    envVariables:
+                      AIDI_BASE_URL: <+variable.account.aidi_base_url>
+                      AIDI_API_KEY: <+secrets.getValue("aidi_api_key")>
+                    command: bash scripts/push-aidi-event.sh construction_complete intent="<+pipeline.variables.intent>"
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: MarkAsSuccess
+    - stage:
+        name: Release Approval
+        identifier: Release_Approval
+        type: Approval
+        spec:
+          execution:
+            steps:
+              - step:
+                  type: HarnessApproval
+                  name: Approve Release
+                  identifier: Approve_Release
+                  timeout: 1d
+                  spec:
+                    approvalMessage: Review build, test and scan results for the AI-generated change before deploy.
+                    includePipelineExecutionHistory: true
+                    isAutoRejectEnabled: false
+                    approvers:
+                      userGroups:
+                        - <+input>
+                      minimumCount: 1
+                      disallowPipelineExecutor: true
+                    approverInputs: []
+    - stage:
+        name: Deploy
+        identifier: Deploy
+        description: Publishes the approved build to GitHub Pages (gh-pages branch). Swap for a Harness CD stage for a real target.
+        type: CI
+        spec:
+          cloneCodebase: true
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Cloud
+            spec: {}
+          execution:
+            steps:
+              - step:
+                  type: Run
+                  name: Publish To GitHub Pages
+                  identifier: Publish_To_GitHub_Pages
+                  spec:
+                    shell: Bash
+                    envVariables:
+                      GIT_TOKEN: <+secrets.getValue("git_push_token")>
+                    command: |-
+                      set -euo pipefail
+                      git fetch origin "aidlc/<+pipeline.variables.inception_execution_id>"
+                      git checkout "aidlc/<+pipeline.variables.inception_execution_id>"
+                      rm -rf _site && mkdir _site
+                      cp index.html app.js styles.css config.json industries.json flags.json _site/
+                      cd _site
+                      git init -q -b gh-pages
+                      git config user.name "aidlc-bot"
+                      git config user.email "aidlc-bot@example.com"
+                      git add -A
+                      git commit -q -m "Deploy from Harness execution <+pipeline.executionId>"
+                      git push -f "https://x-access-token:${GIT_TOKEN}@$(cd .. && git remote get-url origin | sed 's#https://##')" gh-pages
+                      echo "Deployed. Pages URL: see repo Settings > Pages"
+                  timeout: 10m

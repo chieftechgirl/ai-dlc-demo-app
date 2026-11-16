@@ -23,7 +23,8 @@ class Meta(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
-        if tag == "title":
+        if tag == "title" and not self.title:
+            # first <title> only: inline SVGs often carry their own <title>s
             self._in_title = True
         elif tag == "meta":
             k = a.get("property") or a.get("name")

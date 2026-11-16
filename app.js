@@ -2,12 +2,22 @@
 // Settings come from config.json; URL params override for quick demos:
 //   ?industry=healthcare&company=Acme&primary=%23ff6600
 (async function () {
-  const [config, industries] = await Promise.all([
+  const [config, industries, flagDefaults] = await Promise.all([
     fetch("config.json").then(r => r.json()),
     fetch("industries.json").then(r => r.json()),
+    fetch("flags.json").then(r => r.json()).catch(() => ({})),
   ]);
 
   const params = new URLSearchParams(location.search);
+
+  // Feature flags: defaults live in flags.json; override per-demo with ?flag.name=on|off.
+  // New features should ship dark behind a flag: if (flag("overdueBadge")) { ... }
+  function flag(name) {
+    const o = params.get("flag." + name);
+    if (o !== null) return o === "on" || o === "true" || o === "1";
+    return Boolean(flagDefaults[name]);
+  }
+  window.flag = flag;
   const key = params.get("industry") || localStorage.getItem("industry") || config.industry;
   const company = params.get("company") || config.company.name;
   const brand = {

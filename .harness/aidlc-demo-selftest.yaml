@@ -1,0 +1,107 @@
+pipeline:
+  name: AIDLC Demo Self Test
+  identifier: AIDLC_Demo_Self_Test
+  projectIdentifier: aidlc_claude_reference
+  orgIdentifier: sandbox
+  tags:
+    purpose: selftest
+  description: Tests the AI-DLC governance logic. No model key and no repo needed.
+  stages:
+    - stage:
+        name: Policy Unit Tests
+        identifier: Policy_Unit_Tests
+        description: Runs OPA unit tests on the evidence-gate policy with good and bad evidence.
+        type: CI
+        spec:
+          cloneCodebase: false
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Cloud
+            spec: {}
+          execution:
+            steps:
+              - step:
+                  type: Run
+                  name: OPA Tests
+                  identifier: OPA_Tests
+                  spec:
+                    shell: Bash
+                    command: |-
+                      set -euo pipefail
+                      mkdir -p t && cd t
+                      curl -fsSL -o opa https://openpolicyagent.org/downloads/v0.68.0/opa_linux_amd64_static
+                      chmod +x opa
+                      cat > gate.rego <<'REGO'
+                      package aidlc
+                      deny[msg] {
+                      	count(input.intents) == 0
+                      	msg := "no AI-DLC intent records found"
+                      }
+                      deny[msg] {
+                      	it := input.intents[_]
+                      	not it.has_state_file
+                      	msg := sprintf("intent '%s' has no aidlc-state.md", [it.intent])
+                      }
+                      deny[msg] {
+                      	it := input.intents[_]
+                      	it.audit_files == 0
+                      	msg := sprintf("intent '%s' has an empty audit trail", [it.intent])
+                      }
+                      deny[msg] {
+                      	it := input.intents[_]
+                      	it.approval_events < input.min_approvals
+                      	msg := sprintf("intent '%s' has %d approvals, need %d", [it.intent, it.approval_events, input.min_approvals])
+                      }
+                      deny[msg] {
+                      	input.phase == "construction"
+                      	it := input.intents[_]
+                      	it.stage_documents == 0
+                      	msg := sprintf("intent '%s' has no stage documents", [it.intent])
+                      }
+                      REGO
+                      cat > gate_test.rego <<'REGO'
+                      package aidlc
+                      good := {"phase": "construction", "min_approvals": 1, "intents": [{"intent": "a", "has_state_file": true, "audit_files": 3, "approval_events": 2, "stage_documents": 4}]}
+                      test_good_passes { count(deny) == 0 with input as good }
+                      test_no_intents_denied { count(deny) > 0 with input as {"phase": "inception", "min_approvals": 0, "intents": []} }
+                      test_missing_state_denied { count(deny) > 0 with input as {"phase": "inception", "min_approvals": 0, "intents": [{"intent": "a", "has_state_file": false, "audit_files": 1, "approval_events": 0, "stage_documents": 1}]} }
+                      test_empty_audit_denied { count(deny) > 0 with input as {"phase": "inception", "min_approvals": 0, "intents": [{"intent": "a", "has_state_file": true, "audit_files": 0, "approval_events": 0, "stage_documents": 1}]} }
+                      test_no_approval_denied_in_construction { count(deny) > 0 with input as {"phase": "construction", "min_approvals": 1, "intents": [{"intent": "a", "has_state_file": true, "audit_files": 2, "approval_events": 0, "stage_documents": 2}]} }
+                      test_no_stage_docs_denied_in_construction { count(deny) > 0 with input as {"phase": "construction", "min_approvals": 0, "intents": [{"intent": "a", "has_state_file": true, "audit_files": 2, "approval_events": 1, "stage_documents": 0}]} }
+                      test_zero_approvals_ok_in_inception { count(deny) == 0 with input as {"phase": "inception", "min_approvals": 0, "intents": [{"intent": "a", "has_state_file": true, "audit_files": 2, "approval_events": 0, "stage_documents": 2}]} }
+                      REGO
+                      ./opa test -v gate.rego gate_test.rego
+                  timeout: 10m
+              - step:
+                  type: Run
+                  name: Make Good Evidence
+                  identifier: Make_Good_Evidence
+                  spec:
+                    shell: Bash
+                    command: |-
+                      export evidence_json='{"phase":"construction","min_approvals":1,"intents":[{"intent":"selftest","has_state_file":true,"audit_files":3,"approval_events":2,"stage_documents":4}]}'
+                    outputVariables:
+                      - name: evidence_json
+                        type: String
+                        value: evidence_json
+    - stage:
+        name: Evidence Policy
+        identifier: Evidence_Policy
+        description: Evaluates good evidence against the Harness policy set. Policy steps run in a Custom stage.
+        type: Custom
+        spec:
+          execution:
+            steps:
+              - step:
+                  type: Policy
+                  name: Evidence Gate On Good Evidence
+                  identifier: Evidence_Gate_On_Good_Evidence
+                  spec:
+                    policySets:
+                      - aidlc_evidence_gate
+                    type: Custom
+                    policySpec:
+                      payload: <+pipeline.stages.Policy_Unit_Tests.spec.execution.steps.Make_Good_Evidence.output.outputVariables.evidence_json>
+                  timeout: 10m

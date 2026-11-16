@@ -1,0 +1,152 @@
+pipeline:
+  name: AIDLC Demo Inception
+  identifier: AIDLC_Demo_Inception
+  projectIdentifier: aidlc_claude_reference
+  orgIdentifier: sandbox
+  tags:
+    aidlc: inception
+    agent: claude
+  properties:
+    ci:
+      codebase:
+        connectorRef: <+input>   # your Git connector
+        repoName: <+input>
+        build: <+input>
+  variables:
+    - name: intent
+      type: String
+      description: What to build, in plain words (becomes the /aidlc prompt)
+      value: <+input>
+    - name: aidlc_profile
+      type: String
+      description: AI-DLC workflow profile (classic, express, feature, mvp, poc)
+      value: express
+  stages:
+    - stage:
+        name: Inception with Claude
+        identifier: Inception_with_Claude
+        description: Claude Code runs the AI-DLC Inception phase headlessly and stops at the approval gate.
+        type: CI
+        spec:
+          cloneCodebase: true
+          caching:
+            enabled: true
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Cloud
+            spec: {}
+          execution:
+            steps:
+              - step:
+                  type: Run
+                  name: Setup Claude Code and AI-DLC
+                  identifier: Setup_Claude_AIDLC
+                  spec:
+                    shell: Bash
+                    command: bash scripts/setup-claude.sh
+              - step:
+                  type: Run
+                  name: Run Inception
+                  identifier: Run_Inception
+                  spec:
+                    shell: Bash
+                    envVariables:
+                      ANTHROPIC_API_KEY: <+secrets.getValue("anthropic_api_key")>
+                      AIDLC_PROFILE: <+pipeline.variables.aidlc_profile>
+                    command: bash scripts/run-aidlc-headless.sh inception "<+pipeline.variables.intent>"
+                  timeout: 45m
+              - step:
+                  type: Run
+                  name: Collect Evidence
+                  identifier: Collect_Evidence
+                  spec:
+                    shell: Bash
+                    command: |-
+                      # Inception stops at the first gate, so 0 approvals is expected here.
+                      python3 scripts/aidlc-gate-check.py --phase inception --min-approvals 0 --out aidlc-evidence.json
+                      export evidence_json="$(python3 -c 'import json;print(json.dumps(json.load(open("aidlc-evidence.json"))))')"
+                    outputVariables:
+                      - name: evidence_json
+                        type: String
+                        value: evidence_json
+              - step:
+                  type: Run
+                  name: Publish Artifacts To Review Branch
+                  identifier: Publish_Artifacts
+                  spec:
+                    shell: Bash
+                    envVariables:
+                      GIT_TOKEN: <+secrets.getValue("git_push_token")>
+                      REVIEW_BRANCH: aidlc/<+pipeline.executionId>
+                    command: |-
+                      git config user.name "aidlc-bot"
+                      git config user.email "aidlc-bot@example.com"
+                      git checkout -b "$REVIEW_BRANCH"
+                      git add aidlc aidlc-evidence.json
+                      git commit -m "AI-DLC inception artifacts for review (execution <+pipeline.executionId>)"
+                      git push "https://x-access-token:${GIT_TOKEN}@$(git remote get-url origin | sed 's#https://##')" "$REVIEW_BRANCH"
+                      echo "Review the artifacts on branch: $REVIEW_BRANCH"
+              - step:
+                  type: Run
+                  name: Notify AI DLC Insights
+                  identifier: Notify_AIDI
+                  spec:
+                    shell: Bash
+                    envVariables:
+                      AIDI_BASE_URL: <+variable.account.aidi_base_url>
+                      AIDI_API_KEY: <+secrets.getValue("aidi_api_key")>
+                    command: bash scripts/push-aidi-event.sh inception_artifacts_published intent="<+pipeline.variables.intent>" profile="<+pipeline.variables.aidlc_profile>"
+                  failureStrategies:
+                    - onFailure:
+                        errors:
+                          - AllErrors
+                        action:
+                          type: MarkAsSuccess
+    - stage:
+        name: Evidence Policy
+        identifier: Evidence_Policy
+        description: Policy steps run in a Custom stage. Evaluates the evidence JSON against the aidlc_evidence_gate policy set.
+        type: Custom
+        spec:
+          execution:
+            steps:
+              - step:
+                  type: Policy
+                  name: AIDLC Evidence Policy
+                  identifier: AIDLC_Evidence_Policy
+                  spec:
+                    policySets:
+                      - aidlc_evidence_gate
+                    type: Custom
+                    policySpec:
+                      payload: <+pipeline.stages.Inception_with_Claude.spec.execution.steps.Collect_Evidence.output.outputVariables.evidence_json>
+                  timeout: 10m
+    - stage:
+        name: Human Approval Gate
+        identifier: Human_Approval_Gate
+        description: The gate of record. A person reviews the Inception artifacts before Construction may run.
+        type: Approval
+        spec:
+          execution:
+            steps:
+              - step:
+                  type: HarnessApproval
+                  name: Approve AIDLC Inception
+                  identifier: Approve_AIDLC_Inception
+                  timeout: 3d
+                  spec:
+                    approvalMessage: |-
+                      Review the AI-DLC Inception artifacts on branch aidlc/<+pipeline.executionId>
+                      (requirements, design, plan, review findings under aidlc/spaces/*/intents/*).
+                      Approve to allow the Construction pipeline to run.
+                    includePipelineExecutionHistory: true
+                    isAutoRejectEnabled: false
+                    approvers:
+                      userGroups:
+                        - <+input>   # e.g. account._project_all_users or a product-owner group
+                      minimumCount: 1
+                      disallowPipelineExecutor: true
+                    approverInputs: []
+        failureStrategies: []
