@@ -10,12 +10,16 @@ The AI-DLC methodology is [AWS Labs' `aidlc-workflows`](https://github.com/awsla
 flowchart LR
     I(["Client<br/>intent"]) --> A
 
-    subgraph P1["Pipeline 1: Inception"]
+    subgraph P1["Pipeline 1: Inception (in CI)"]
         direction LR
-        A["AI-DLC<br/>Inception"]:::aws --> B{{"OPA<br/>evidence<br/>policy"}}:::gov --> C{{"Human<br/>approval"}}:::gov
+        A["AI-DLC Inception<br/>Claude Code"]:::aws --> B{{"OPA<br/>evidence<br/>policy"}}:::gov --> C{{"Human<br/>approval"}}:::gov
     end
 
+    K["AI-DLC Inception<br/>Kiro or Cursor<br/>(at the desk)"]:::aws
+
+    I --> K
     C --> D
+    K -. "push aidlc/id branch" .-> D
 
     subgraph P2["Pipeline 2: Construction"]
         direction LR
@@ -30,7 +34,7 @@ flowchart LR
     classDef gov fill:#0278D5,stroke:#014B8A,color:#fff
 ```
 
-**Legend:** orange steps are AWS AI-DLC, run by Claude Code. Blue steps are Harness governance gates. Everything else is standard CI/CD.
+**Legend:** orange steps are AWS AI-DLC. It runs in CI with Claude Code, or interactively in Kiro or Cursor at a developer's desk (dotted path); either way the records land in the repo's `aidlc/` folder and Harness takes over at the Construction gate. Blue steps are Harness governance gates. Everything else is standard CI/CD.
 
 | AI-DLC phase | Covered here | Notes |
 |--------------|--------------|-------|
