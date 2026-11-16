@@ -59,5 +59,20 @@ class BrandParserTests(unittest.TestCase):
         self.assertEqual(m.icons, ["/i.png"])
 
 
+class OverrideTests(unittest.TestCase):
+    def test_overrides_win(self):
+        import brand
+        cfg = {"company": {"name": "Long Site Title: Home"}, "brand": {"primary": "#0278D5", "accent": "#00ADE4", "dark": "#0B1727"}}
+        brand.apply_overrides(cfg, name="Acme", primary="#E60028")
+        self.assertEqual(cfg["company"]["name"], "Acme")
+        self.assertEqual(cfg["brand"]["primary"], "#E60028")
+        self.assertEqual(cfg["brand"]["accent"], "#00ADE4")
+
+    def test_bad_color_rejected(self):
+        import brand
+        with self.assertRaises(SystemExit):
+            brand.apply_overrides({"company": {}, "brand": {}}, primary="red")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -73,6 +73,33 @@ Industry keys: `retail`, `healthcare`, `financial-services`, `insurance`, `manuf
 
 The website fetch is best effort: it reads the page title, Open Graph tags, icon link and `theme-color`. Check `config.json` afterwards and fix anything it got wrong.
 
+## Rebrand for a customer (standard Harness to their brand)
+
+Run one command from the project root. It reads the company's website for the name and logo, and the flags set the
+parts a website rarely exposes (a short name and brand colors). Example for a fictional company:
+
+```bash
+python3 scripts/brand.py https://www.acme-pharma.example --industry healthcare \
+  --name "Acme Pharma" --primary '#E60028' --accent '#FF5A73' --dark '#1A1A1F'
+python3 -m http.server 8000
+```
+
+Refresh http://localhost:8000 and you should see the company's name and logo in the header, the brand color on the
+banner, and the industry's own tagline and records (healthcare shows "Cases").
+
+| Flag | What it sets |
+|------|--------------|
+| `--industry` | Which preset to use (`retail`, `healthcare`, `financial-services`, `insurance`, `manufacturing`, `travel`, `technology`) |
+| `--name` | Short company name (site titles are often long, like "Acme: Global Homepage") |
+| `--primary`, `--accent`, `--dark` | Brand colors as `#RRGGBB`. Find them in the company's brand guidelines or with a color picker on their site |
+
+The site fetch is best effort, so check the result. If the logo looks wrong, edit `company.logoUrl` in `config.json`.
+Customer-specific branding is a local change: undo it with the reset below before you commit.
+
 ## Reset to Harness
 
-Set `config.json` back to the defaults (`company.name` "Harness", `https://www.harness.io`, primary `#0278D5`).
+```bash
+git checkout config.json
+```
+
+Or set `config.json` back to the defaults by hand (`company.name` "Harness", `https://www.harness.io`, primary `#0278D5`).

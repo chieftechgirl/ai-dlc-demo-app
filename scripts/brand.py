@@ -42,10 +42,26 @@ class Meta(HTMLParser):
             self.title += data
 
 
+def apply_overrides(cfg, name=None, primary=None, accent=None, dark=None):
+    """Explicit flags win over whatever was scraped from the site."""
+    if name:
+        cfg["company"]["name"] = name
+    for key, val in (("primary", primary), ("accent", accent), ("dark", dark)):
+        if val:
+            if not re.fullmatch(r"#[0-9a-fA-F]{6}", val):
+                sys.exit(f"--{key} must look like #E60028, got {val!r}")
+            cfg["brand"][key] = val
+    return cfg
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("url")
     p.add_argument("--industry", help="industry key from industries.json")
+    p.add_argument("--name", help="override the company name (site titles are often long)")
+    p.add_argument("--primary", help="override primary color, e.g. #E60028")
+    p.add_argument("--accent", help="override accent color")
+    p.add_argument("--dark", help="override header/dark color")
     args = p.parse_args()
 
     url = args.url if args.url.startswith("http") else "https://" + args.url
@@ -70,13 +86,15 @@ def main():
         cfg["brand"]["primary"] = color
     if args.industry:
         cfg["industry"] = args.industry
+    apply_overrides(cfg, args.name, args.primary, args.accent, args.dark)
+    name = cfg["company"]["name"]
     CONFIG.write_text(json.dumps(cfg, indent=2) + "\n")
 
     print(f"Updated {CONFIG.name}:")
     print(f"  name     : {name}")
     print(f"  (site description, not saved: {tagline[:60]})")
     print(f"  logo     : {logo or '(none found)'}")
-    print(f"  primary  : {cfg['brand']['primary']}" + ("" if color else "  (no theme-color on site; unchanged)"))
+    print(f"  primary  : {cfg['brand']['primary']}" + ("" if (color or args.primary) else "  (no theme-color on site; unchanged, pass --primary to set it)"))
 
 
 if __name__ == "__main__":
