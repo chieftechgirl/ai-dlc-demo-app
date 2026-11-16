@@ -4,7 +4,7 @@ A tiny, dependency-free demo app that re-skins itself by **industry** and **comp
 
 ## How AI-DLC runs in Harness
 
-The AI-DLC methodology is [AWS Labs' `aidlc-workflows`](https://github.com/awslabs/aidlc-workflows). Claude Code runs it unattended inside Harness CI. Harness adds the enforced approval gates, policy checks, build, test, scan, deploy and measurement around it.
+The AI-DLC methodology is [AWS Labs' `aidlc-workflows`](https://github.com/awslabs/aidlc-workflows). A coding agent runs it unattended inside Harness CI (Claude Code in the reference pipelines; both the agent and the model endpoint are swappable, see [docs/SETUP.md](docs/SETUP.md)). Harness adds the enforced approval gates, policy checks, build, test, scan, deploy and measurement around it.
 
 ```mermaid
 flowchart LR
@@ -12,7 +12,7 @@ flowchart LR
 
     subgraph P1["Pipeline 1: Inception (in CI)"]
         direction LR
-        A["AI-DLC Inception<br/>Claude Code"]:::aws --> B{{"OPA<br/>evidence<br/>policy"}}:::gov --> C{{"Human<br/>approval"}}:::gov
+        A["AI-DLC Inception<br/>coding agent"]:::aws --> B{{"OPA<br/>evidence<br/>policy"}}:::gov --> C{{"Human<br/>approval"}}:::gov
     end
 
     K["AI-DLC Inception<br/>Kiro or Cursor<br/>(at the desk)"]:::aws
@@ -34,7 +34,7 @@ flowchart LR
     classDef gov fill:#0278D5,stroke:#014B8A,color:#fff
 ```
 
-**Legend:** orange steps are AWS AI-DLC. It runs in CI with Claude Code, or interactively in Kiro or Cursor at a developer's desk (dotted path); either way the records land in the repo's `aidlc/` folder and Harness takes over at the Construction gate. Blue steps are Harness governance gates. Everything else is standard CI/CD.
+**Legend:** orange steps are AWS AI-DLC. It runs in CI with a coding agent (any supported tool and model endpoint), or interactively in Kiro or Cursor at a developer's desk (dotted path); either way the records land in the repo's `aidlc/` folder and Harness takes over at the Construction gate. Blue steps are Harness governance gates. Everything else is standard CI/CD.
 
 | AI-DLC phase | Covered here | Notes |
 |--------------|--------------|-------|
@@ -49,16 +49,41 @@ Nothing here is tied to a specific Harness project or cloud account. You supply:
 | You bring | Used for |
 |-----------|----------|
 | A coding tool: Kiro, Cursor or Claude Code | Running AWS's AI-DLC interactively |
-| Model access: an Anthropic API key, or your own AWS account with Amazon Bedrock | The model behind AI-DLC |
+| Model access: the endpoint of your choice (Anthropic API, your own AWS account with Amazon Bedrock, or any other endpoint) | The model behind AI-DLC |
 | A Harness account (org and project) | Pipelines with enforced approvals, policy, tests, scan and deploy |
 | A GitHub account | Your fork, the review branches and the GitHub Pages site |
 
-Start with **[docs/SETUP.md](docs/SETUP.md)**. It walks through each layer, and `scripts/setup_harness.py` fills your
-org and project into the pipeline templates (`--provider bedrock` switches them to your AWS account).
+Start with **[docs/SETUP.md](docs/SETUP.md)**. It walks through each layer. To test in your own Harness tenant, set
+`HARNESS_ACCOUNT_ID` and `HARNESS_API_KEY` in your shell, then:
+
+```bash
+python3 scripts/harness_connect.py --org <org> --project <project> check          # read-only connection test
+python3 scripts/harness_connect.py --org <org> --project <project> apply --yes    # create the 3 pipelines
+```
+
+`scripts/setup_harness.py` does the same templating without touching your tenant (it writes YAML you paste in yourself).
+
+## Connect to any model endpoint
+
+Pick where the model comes from when you render the pipelines for your Harness account:
+
+```bash
+# Anthropic API key (default)
+python3 scripts/setup_harness.py --org <org> --project <project>
+
+# Amazon Bedrock in your own AWS account
+python3 scripts/setup_harness.py --org <org> --project <project> --provider bedrock --aws-region us-east-1
+
+# Any other model endpoint or gateway you choose
+python3 scripts/setup_harness.py --org <org> --project <project> --provider custom --base-url https://<your-endpoint> --model <name>
+```
+
+Keys always live in Harness secrets, never in files. Requirements, secret names, and how to swap the CI coding agent
+itself (opencode, Codex CLI, Copilot, Kiro, Cursor) are in [docs/SETUP.md](docs/SETUP.md#layer-2-connect-to-the-model-endpoint-of-your-choice).
 
 ## Use your own AI coding tool (Kiro, Cursor, Claude Code)
 
-AI-DLC is one core that runs natively in several tools. The Harness pipelines use Claude Code in CI; at your
+AI-DLC is one core that runs natively in several tools. The reference pipelines use Claude Code as the CI agent (swappable); at your
 desk you can use whichever you prefer. Install AI-DLC, then configure the project:
 
 ```bash

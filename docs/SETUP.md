@@ -5,7 +5,7 @@ This demo has three layers. You can stop after layer 1 and still have something 
 | Layer | What it is | You need |
 |-------|------------|----------|
 | 1. AI-DLC + a coding tool | AWS's [AI-DLC](https://github.com/awslabs/aidlc-workflows) running in Kiro, Cursor or Claude Code | A coding tool and the `aidlc` installer |
-| 2. Model access | Where the model comes from | An Anthropic API key **or** your own AWS account with Amazon Bedrock |
+| 2. Model access | Where the model comes from | Your choice of endpoint: Anthropic API, your own AWS account with Amazon Bedrock, or any other model endpoint |
 | 3. Harness | Pipelines that run AI-DLC in CI with enforced approvals, policy, tests, scan and deploy | Your own Harness account and a GitHub account |
 
 Nothing here depends on anyone else's Harness project, org or secrets. Everything below uses placeholders you replace with your own values.
@@ -16,27 +16,106 @@ Nothing here depends on anyone else's Harness project, org or secrets. Everythin
 
 ---
 
+## Quick start: connect your own Harness tenant
+
+This is the fastest way to test the Harness side in **your** account. It uses an API token from your tenant. Treat
+the token like a password: it stays in your terminal environment and is never written into this repo.
+
+1. **Find your account id.** It is the id in your Harness URL after `/account/`, for example `app.harness.io/ng/account/<ACCOUNT_ID>/...`.
+2. **Pick or create an org and project.** In Harness, create a project (for example `ai_dlc_demo`). Note the **identifiers**, not the display names. The default org identifier is usually `default`.
+3. **Create an API token.**
+   - Quick test: your profile (bottom-left) > **My API Keys** > **API Key** > **Token**.
+   - Shared or CI use: Account Settings > Access Control > **Service Accounts**, then add a token.
+   - Give it permission to view the project and create pipelines in it (for example Project Admin on a throwaway project). Copy the token when it is shown; you cannot see it again.
+4. **Put the token in your environment** (this stays in your shell session only):
+```bash
+export HARNESS_ACCOUNT_ID=<your account id>
+export HARNESS_API_KEY=<your token>
+```
+5. **Check the connection** (read-only):
+```bash
+python3 scripts/harness_connect.py --org <org> --project <project> check
+```
+   You should see `OK: connected`. If not: `401` means the token is wrong or expired, `403` means it lacks permission, and `404` means the org, project or account id is wrong.
+6. **Preview, then create the pipelines.** Add the model options from layer 2 if you are not using an Anthropic key.
+```bash
+python3 scripts/harness_connect.py --org <org> --project <project> apply          # dry run, sends nothing
+python3 scripts/harness_connect.py --org <org> --project <project> apply --yes    # creates the 3 pipelines
+```
+   It never overwrites an existing pipeline. Other Harness clusters: add `--harness-url https://app3.harness.io`. The token is only ever sent to a `harness.io` host over https.
+7. **Finish in the Harness UI** (the script does not create these): secrets, a GitHub connector, an approver group and the `aidlc_evidence_gate` policy set. Steps 3 to 6 of layer 3 below cover each one.
+8. **Run `AIDLC Demo Self Test`** to prove the governance logic, then follow the live flow in [DEMO.md](../DEMO.md).
+9. **When you are done testing,** revoke or delete the API token.
+
+If you prefer not to use a token, skip this and paste the YAML by hand (layer 3, steps 7 and 8).
+
+---
+
 ## Layer 1: AI-DLC with your coding tool (about 20 minutes)
 
 Follow **[DEMO.md, Demo track B](../DEMO.md#demo-track-b-run-ai-dlc-interactively-in-kiro-or-cursor)**. It covers Kiro IDE, Kiro CLI, Cursor and Claude Code. You need no Harness account for this.
 
-## Layer 2: Choose where the model comes from
+## Layer 2: Connect to the model endpoint of your choice
 
-Pick one. Both work with the pipelines in layer 3.
+AI-DLC itself is provider-independent. Model access belongs to the coding tool that runs it (AWS calls the tool a "harness"). So there are two separate choices: **which tool runs AI-DLC**, and **where that tool gets its model**.
 
-### Option A: Anthropic API key (simplest)
+| Route | Use it when | Pipeline option | Harness secret(s) |
+|-------|-------------|-----------------|-------------------|
+| **A. Anthropic API** | You have an Anthropic API key | `--provider anthropic` (default) | `anthropic_api_key` |
+| **B. Amazon Bedrock** | Models must stay in your AWS account | `--provider bedrock --aws-region <region>` | `aws_access_key_id`, `aws_secret_access_key` |
+| **C. Any other endpoint** | You run a model gateway or proxy (an internal LLM gateway, LiteLLM, a cloud provider's compatible endpoint) | `--provider custom --base-url https://<your-endpoint>` | `model_endpoint_key` |
+| **D. A different coding tool** | You prefer opencode, Codex CLI, GitHub Copilot, Cursor or Kiro | See "Use a different agent in CI" below | Whatever that tool needs |
 
-Create a key in your Anthropic account. You will store it as the Harness secret `anthropic_api_key` in layer 3.
+For every route you can add `--model <model id or name>` to pass a model to the agent.
 
-### Option B: Your own AWS account with Amazon Bedrock
+### Route A: Anthropic API key
 
-1. In the AWS console, open **Amazon Bedrock > Model access** in your chosen region and enable the Claude model you want.
+Create a key in your Anthropic account and store it as the Harness secret `anthropic_api_key` (layer 3, step 3).
+
+### Route B: Your own AWS account with Amazon Bedrock
+
+1. In the AWS console, open **Amazon Bedrock > Model access** in your chosen region and enable the model you want.
 2. Create an IAM identity that can invoke Bedrock models (permissions such as `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream` for that model). Use the least access that works.
-3. Create access keys for it, and store them as the Harness secrets `aws_access_key_id` and `aws_secret_access_key` in layer 3. Long-lived keys are fine for a throwaway demo account. For anything real, use short-lived credentials or OIDC instead.
-4. When you render the pipelines (layer 3, step 7) pass `--provider bedrock --aws-region <your-region>`, and optionally `--model <model id or inference profile>`.
-5. AI-DLC itself has Bedrock provider settings. See AWS's README (`aidlc config providers`) and your harness guide for anything beyond what the pipeline sets.
+3. Create access keys and store them as the Harness secrets `aws_access_key_id` and `aws_secret_access_key`. Long-lived keys are fine for a throwaway demo account. For anything real, use short-lived credentials or OIDC instead.
+4. Render with `--provider bedrock --aws-region <your-region>` (layer 3, step 7), optionally `--model <model id or inference profile>`.
+5. AI-DLC also has its own Bedrock provider settings. See AWS's README (`aidlc config providers`) for anything beyond what the pipeline sets.
 
-On the Kiro IDE and Kiro CLI, model access comes with Kiro, so layer 1 needs no provider setup.
+### Route C: Any other model endpoint
+
+Point the agent at an endpoint you control or trust:
+
+```bash
+python3 scripts/setup_harness.py --org <org> --project <project> \
+  --provider custom --base-url https://<your-endpoint> --model <model name>
+```
+
+Then create the Harness secret `model_endpoint_key` holding the token for that endpoint. The pipeline passes it to the agent as `ANTHROPIC_AUTH_TOKEN` and the URL as `ANTHROPIC_BASE_URL`.
+
+Requirements and cautions:
+
+- The default CI agent (Claude Code) speaks the **Anthropic Messages API** with tool use. Your endpoint must expose that API. If your model only offers a different API style, run a gateway that translates in front of it.
+- Use `https://` only. Keep the token in a Harness secret, never in a file, a commit or a pipeline variable.
+- Check what the endpoint's operator logs and retains. The agent sends your code and prompts to it.
+- This route is untested with any particular gateway. Start with a trivial intent and confirm the Inception run produces records under `aidlc/`.
+
+If no model route is configured, the AI-DLC step stops immediately with "No model access configured".
+
+### Route D: Use a different agent in CI
+
+The pipelines use Claude Code as the CI agent by default, but nothing downstream depends on it. The evidence check, policy, approvals, build, test, scan and deploy all read the `aidlc/` records, whichever tool wrote them. AWS's AI-DLC supports Kiro, Cursor, opencode, Codex CLI and GitHub Copilot, and each manages its own provider and model (see AWS's per-harness guides). For example, opencode takes its provider from your opencode config, which can point at many providers.
+
+To switch the CI agent:
+
+1. Copy `scripts/setup-claude.sh` to `scripts/setup-<agent>.sh`. Install that agent's CLI, then run `aidlc config --harness <name> --yes` and `aidlc doctor`.
+2. Copy `scripts/run-aidlc-headless.sh`. Keep the prompt-building part, which tells the agent to run only one phase and never self-approve. Replace the final `claude -p ...` line with your agent's non-interactive command.
+3. In `.harness/aidlc-demo-inception.yaml` and `aidlc-demo-construction.yaml`, point the Setup and Run steps at your scripts and supply that agent's credentials as Harness secrets instead of the model variables.
+4. Run the Self Test, then Inception with a trivial intent.
+
+Headless behavior differs by tool and release, and the renderer's `--provider` options only know the Claude Code routes above, so expect to test this route yourself.
+
+On Kiro, model access comes with Kiro, so interactive use (layer 1) needs no provider setup.
+
+---
 
 ## Layer 3: Your own Harness account
 
@@ -57,8 +136,9 @@ Project Settings > Secrets > New Secret > Text. Enter values in the Harness UI. 
 | Secret identifier | What to put in it | Needed when |
 |-------------------|-------------------|-------------|
 | `git_push_token` | A GitHub token that can push to your fork (fine-grained: Contents read and write on that repo) | Always |
-| `anthropic_api_key` | Your Anthropic API key | Option A |
-| `aws_access_key_id`, `aws_secret_access_key` | Your AWS credentials | Option B |
+| `anthropic_api_key` | Your Anthropic API key | Route A |
+| `aws_access_key_id`, `aws_secret_access_key` | Your AWS credentials | Route B |
+| `model_endpoint_key` | Token for your own model endpoint | Route C |
 | `aidi_api_key` | Harness API key for AI DLC Insights | Only with `--insights` |
 
 ### 4. Create a GitHub connector
@@ -88,6 +168,9 @@ Common variations:
 ```bash
 # Use Amazon Bedrock instead of an Anthropic API key
 python3 scripts/setup_harness.py --org <org> --project <project> --provider bedrock --aws-region us-east-1
+
+# Use any other model endpoint
+python3 scripts/setup_harness.py --org <org> --project <project> --provider custom --base-url https://<your-endpoint>
 
 # Keep the optional AI DLC Insights event step
 python3 scripts/setup_harness.py --org <org> --project <project> --insights
@@ -127,8 +210,9 @@ After the first successful Deploy, go to your fork's **Settings > Pages**, choos
 | Policy step fails with "policy set not found" | The Policy Set must be named exactly `aidlc_evidence_gate` and live in the same project (or a parent scope) as the pipeline. |
 | Stuck at the first approval | The person who ran the pipeline cannot approve it. Add a second user to the approver group. |
 | `aidlc: command not found` in CI | The setup step installs AI-DLC and adds it to `PATH`. Check that step's log for the installer error. |
-| Claude step fails immediately | No model access. Check the `anthropic_api_key` secret, or for Bedrock the AWS secrets, region and model access. |
+| AI-DLC step fails immediately | No model access, or the wrong route. Check the secret for your route (`anthropic_api_key`, the AWS pair, or `model_endpoint_key`), the region or base URL, and that you rendered with the matching `--provider`. |
 | Evidence check fails with 0 approvals | The check looks for the word "approved" in AI-DLC's audit files. If your tool records approvals differently, pass `--approval-pattern` to `scripts/aidlc-gate-check.py` in the pipeline. |
+| `harness_connect.py check` returns 401 / 403 / 404 | 401: token wrong or expired. 403: token lacks permission on the project. 404: wrong `--org`, `--project` or `HARNESS_ACCOUNT_ID`. |
 | Push to the repo is rejected | Check that `git_push_token` has write access to your fork. |
 | Deploy succeeds but the site is empty | Enable Pages for the `gh-pages` branch (step 11). The first publish can take a minute or two. |
 

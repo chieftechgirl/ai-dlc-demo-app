@@ -4,7 +4,11 @@
 # Usage: run-aidlc-headless.sh <inception|construction> "<intent description>"
 #
 # Env:
-#   ANTHROPIC_API_KEY  required, unless CLAUDE_CODE_USE_BEDROCK=1 with AWS credentials
+#   Model access (one of):
+#     ANTHROPIC_API_KEY                         Anthropic API
+#     ANTHROPIC_AUTH_TOKEN + ANTHROPIC_BASE_URL  any Anthropic-compatible endpoint or gateway
+#     CLAUDE_CODE_USE_BEDROCK=1 + AWS creds      Amazon Bedrock
+#     CLAUDE_CODE_USE_VERTEX=1 + Google creds   Google Vertex AI
 #   CLAUDE_MODEL       optional model id passed as --model (Bedrock: model id or inference profile)
 #   CLAUDE_TRUST_FLAGS permission flags. Default is an explicit tool allowlist, which also works as root.
 #                      Avoid --dangerously-skip-permissions.
@@ -23,8 +27,11 @@ PROFILE="${AIDLC_PROFILE:-express}"
 ANSWERS_FILE="${AIDLC_ANSWERS_FILE:-intent/answers.md}"
 FLAGS="${CLAUDE_TRUST_FLAGS:---permission-mode acceptEdits --allowedTools Read,Write,Edit,Glob,Grep,Bash}"
 
-[ -n "${ANTHROPIC_API_KEY:-}" ] || [ "${CLAUDE_CODE_USE_BEDROCK:-}" = "1" ] || {
-  echo "Set ANTHROPIC_API_KEY (Harness secret) or CLAUDE_CODE_USE_BEDROCK=1 with AWS credentials" >&2; exit 2; }
+[ -n "${ANTHROPIC_API_KEY:-}" ] || [ -n "${ANTHROPIC_AUTH_TOKEN:-}" ] \
+  || [ "${CLAUDE_CODE_USE_BEDROCK:-}" = "1" ] || [ "${CLAUDE_CODE_USE_VERTEX:-}" = "1" ] || {
+  echo "No model access configured. Set one of: ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN (with ANTHROPIC_BASE_URL for a custom endpoint)," >&2
+  echo "CLAUDE_CODE_USE_BEDROCK=1 with AWS credentials, or CLAUDE_CODE_USE_VERTEX=1 with Google Cloud credentials. Use Harness secrets for keys." >&2
+  exit 2; }
 
 if [ -f "${ANSWERS_FILE}" ]; then
   ANSWERS_HINT="Pre-supplied answers to stage questions are in ${ANSWERS_FILE}; use them instead of asking. If a needed answer is missing, record the question in the stage questions file and stop."

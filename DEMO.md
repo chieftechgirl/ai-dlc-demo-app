@@ -1,4 +1,4 @@
-# Demo script: AI-DLC with Claude Code, run and governed by Harness
+# Demo script: AI-DLC, run and governed by Harness
 
 Audience: engineering leaders and developers. About 15 minutes.
 Story: a client request becomes a reviewed, tested, scanned, flag-guarded release on a live URL, with a human approving at each gate.
@@ -6,12 +6,12 @@ Story: a client request becomes a reviewed, tested, scanned, flag-guarded releas
 ## One-time setup
 
 Setup uses **your own** accounts: your Harness org and project, your GitHub fork, and your own model access
-(an Anthropic API key or your own AWS account with Amazon Bedrock). Nothing depends on anyone else's project.
+(an Anthropic API key, your own AWS account with Amazon Bedrock, or any other model endpoint). Nothing depends on anyone else's project.
 
 Follow **[docs/SETUP.md](docs/SETUP.md)**. In short:
 
 1. Fork this repo. Create the secrets, a GitHub connector, an approver group and the `aidlc_evidence_gate` policy set in your Harness project.
-2. Fill in your org and project: `python3 scripts/setup_harness.py --org <your_org_id> --project <your_project_id>` (add `--provider bedrock` to use your AWS account).
+2. Fill in your org and project: `python3 scripts/setup_harness.py --org <your_org_id> --project <your_project_id>` (add `--provider bedrock` for your AWS account, or `--provider custom --base-url https://<endpoint>` for any other endpoint).
 3. Paste the rendered YAML from `build/harness/` into Harness, then run **AIDLC Demo Self Test**. It needs no model key and proves the governance logic works.
 
 Want to skip Harness for now? Run AI-DLC in Kiro, Cursor or Claude Code with **Demo track B** below.
@@ -21,7 +21,7 @@ Want to skip Harness for now? Run AI-DLC in Kiro, Cursor or Claude Code with **D
 | # | Step | What to say |
 |---|------|-------------|
 | 1 | Show the app at the default brand. Run `python3 scripts/brand.py https://www.<client>.com --industry <key>` and refresh. | "Same app, re-skinned to the client's industry and brand in seconds." |
-| 2 | Run **Inception** with the intent below. | "Claude plans the work. It does not write code yet and it cannot approve itself." |
+| 2 | Run **Inception** with the intent below. | "The AI agent plans the work. It does not write code yet and it cannot approve itself." |
 | 3 | Open the review branch `aidlc/<executionId>`: requirements, design, plan, audit trail. | "Every question, answer and decision is recorded as files in Git." |
 | 4 | Show the **Evidence Policy** result, then **Approve** as a different user. | "Policy checks the evidence exists. A human, not the pipeline, opens the gate." |
 | 5 | Run **Construction** with the Inception execution id (copy it from the Inception run). | "It refuses to start without approved evidence." |
@@ -37,7 +37,7 @@ Swap the wording for the client's industry (claims, cases, orders, work orders).
 
 ## Demo track B: run AI-DLC interactively in Kiro or Cursor
 
-The Harness pipelines run AI-DLC with Claude Code, unattended, in CI. AI-DLC itself is one harness-neutral
+The Harness pipelines run AI-DLC unattended in CI with a coding agent (Claude Code in the reference pipelines, swappable). AI-DLC itself is one harness-neutral
 core that also runs natively in **Kiro** (IDE and CLI) and **Cursor**, so a developer can do the same work
 at their desk with the tool they already use. Same method, same `aidlc/` records in the repo.
 
