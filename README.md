@@ -51,6 +51,21 @@ flowchart TD
 | Construction | Yes | Pipeline 2, runs only after approval |
 | Operations | No | Not in these pipelines |
 
+## Use your own AI coding tool (Kiro, Cursor, Claude Code)
+
+AI-DLC is one core that runs natively in several tools. The Harness pipelines use Claude Code in CI; at your
+desk you can use whichever you prefer. Install AI-DLC, then configure the project:
+
+```bash
+curl -fsSL https://github.com/awslabs/aidlc-workflows/releases/latest/download/install.sh | sh
+aidlc config --harness kiro      # or: cursor, claude
+aidlc doctor
+```
+
+Open the project in your tool and run `/aidlc <what you want to build>` (in Kiro IDE, choose **aidlc** in the agent picker first).
+Full copy-paste steps, the Kiro CLI variants, and a hybrid flow that hands the result to Harness for gates and delivery
+are in [DEMO.md](DEMO.md#demo-track-b-run-ai-dlc-interactively-in-kiro-or-cursor).
+
 ## Run
 
 ```bash
