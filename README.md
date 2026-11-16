@@ -2,6 +2,55 @@
 
 A tiny, dependency-free demo app that re-skins itself by **industry** and **company**, Harness-themed by default. Built for the AI-DLC project.
 
+## How AI-DLC runs in Harness
+
+The AI-DLC methodology is [AWS Labs' `aidlc-workflows`](https://github.com/awslabs/aidlc-workflows). Claude Code runs it unattended inside Harness CI. Harness adds the enforced approval gates, policy checks, build, test, scan, deploy and measurement around it.
+
+```mermaid
+flowchart TD
+    I(["Client request (intent)"]) --> INC
+
+    subgraph P1["Pipeline 1: AIDLC Demo Inception"]
+        INC["Claude Code runs AI-DLC Inception<br/>requirements, design, plan"]:::aws
+        EV1["Collect evidence from aidlc/ records<br/>state, audit trail, stage documents"]
+        POL1{{"OPA policy: aidlc_evidence_gate"}}:::gov
+        BR1[("Review branch<br/>aidlc/executionId")]
+        G1{{"Human approval gate<br/>executor cannot self-approve"}}:::gov
+        INC --> EV1 --> POL1 --> BR1 --> G1
+    end
+
+    G1 -->|approved| VER
+
+    subgraph P2["Pipeline 2: AIDLC Demo Construction"]
+        VER["Verify gate: refuse to build<br/>without approved evidence"]:::gov
+        POL2{{"OPA policy re-check"}}:::gov
+        CON["Claude Code runs AI-DLC Construction<br/>implementation and tests"]:::aws
+        BT["Build and test<br/>python unittest"]
+        SEC["Security scan<br/>gitleaks"]
+        PUB[("Publish build to review branch")]
+        G2{{"Release approval gate"}}:::gov
+        DEP["Deploy to GitHub Pages<br/>gh-pages branch"]
+        VER --> POL2 --> CON --> BT --> SEC --> PUB --> G2 --> DEP
+    end
+
+    DEP --> LIVE(["Live app, new feature dark<br/>behind a flag in flags.json"])
+    LIVE --> FLAG{{"Turn the flag on live<br/>?flag.name=on"}}
+
+    INC -.->|events| AIDI[/"AI DLC Insights"/]
+    CON -.->|events| AIDI
+
+    classDef aws fill:#FF9900,stroke:#B36B00,color:#000
+    classDef gov fill:#0278D5,stroke:#014B8A,color:#fff
+```
+
+**Legend:** orange steps are AWS AI-DLC, run by Claude Code. Blue steps are Harness governance gates. Everything else is standard CI/CD.
+
+| AI-DLC phase | Covered here | Notes |
+|--------------|--------------|-------|
+| Inception | Yes | Pipeline 1, stops at the first gate |
+| Construction | Yes | Pipeline 2, runs only after approval |
+| Operations | No | Not in these pipelines |
+
 ## Run
 
 ```bash
