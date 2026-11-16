@@ -7,37 +7,24 @@ A tiny, dependency-free demo app that re-skins itself by **industry** and **comp
 The AI-DLC methodology is [AWS Labs' `aidlc-workflows`](https://github.com/awslabs/aidlc-workflows). Claude Code runs it unattended inside Harness CI. Harness adds the enforced approval gates, policy checks, build, test, scan, deploy and measurement around it.
 
 ```mermaid
-flowchart TD
-    I(["Client request (intent)"]) --> INC
+flowchart LR
+    I(["Client<br/>intent"]) --> A
 
-    subgraph P1["Pipeline 1: AIDLC Demo Inception"]
-        INC["Claude Code runs AI-DLC Inception<br/>requirements, design, plan"]:::aws
-        EV1["Collect evidence from aidlc/ records<br/>state, audit trail, stage documents"]
-        POL1{{"OPA policy: aidlc_evidence_gate"}}:::gov
-        BR1[("Review branch<br/>aidlc/executionId")]
-        G1{{"Human approval gate<br/>executor cannot self-approve"}}:::gov
-        INC --> EV1 --> POL1 --> BR1 --> G1
+    subgraph P1["Pipeline 1: Inception"]
+        direction LR
+        A["AI-DLC<br/>Inception"]:::aws --> B{{"OPA<br/>evidence<br/>policy"}}:::gov --> C{{"Human<br/>approval"}}:::gov
     end
 
-    G1 -->|approved| VER
+    C --> D
 
-    subgraph P2["Pipeline 2: AIDLC Demo Construction"]
-        VER["Verify gate: refuse to build<br/>without approved evidence"]:::gov
-        POL2{{"OPA policy re-check"}}:::gov
-        CON["Claude Code runs AI-DLC Construction<br/>implementation and tests"]:::aws
-        BT["Build and test<br/>python unittest"]
-        SEC["Security scan<br/>gitleaks"]
-        PUB[("Publish build to review branch")]
-        G2{{"Release approval gate"}}:::gov
-        DEP["Deploy to GitHub Pages<br/>gh-pages branch"]
-        VER --> POL2 --> CON --> BT --> SEC --> PUB --> G2 --> DEP
+    subgraph P2["Pipeline 2: Construction"]
+        direction LR
+        D{{"Verify +<br/>policy"}}:::gov --> E["AI-DLC<br/>Construction"]:::aws --> F["Build, test,<br/>scan"] --> G{{"Release<br/>approval"}}:::gov --> H["Deploy<br/>Pages"]
     end
 
-    DEP --> LIVE(["Live app, new feature dark<br/>behind a flag in flags.json"])
-    LIVE --> FLAG{{"Turn the flag on live<br/>?flag.name=on"}}
-
-    INC -.->|events| AIDI[/"AI DLC Insights"/]
-    CON -.->|events| AIDI
+    H --> L(["Live app<br/>feature flag"])
+    A -.-> X[/"AI DLC<br/>Insights"/]
+    E -.-> X
 
     classDef aws fill:#FF9900,stroke:#B36B00,color:#000
     classDef gov fill:#0278D5,stroke:#014B8A,color:#fff
