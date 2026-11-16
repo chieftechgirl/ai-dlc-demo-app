@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI-DLC Demo App</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img id="logo" alt="" hidden>
+      <span id="company">Harness</span>
+    </div>
+    <div class="controls">
+      <label>Industry
+        <select id="industry"></select>
+      </label>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <p class="eyebrow" id="industryLabel"></p>
+      <h1 id="tagline"></h1>
+      <p class="sub">Demo app for the AI-DLC project. Change <code>config.json</code> or use the picker above.</p>
+    </section>
+
+    <section class="kpis" id="kpis"></section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2 id="recordsTitle"></h2>
+        <form id="addForm">
+          <input id="newItem" placeholder="" required>
+          <button type="submit" id="addBtn"></button>
+        </form>
+      </div>
+      <ul id="list"></ul>
+    </section>
+  </main>
+
+  <footer>Branding sourced from <a id="siteLink" target="_blank" rel="noopener"></a></footer>
+  <script src="app.js"></script>
+</body>
+</html>

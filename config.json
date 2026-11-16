@@ -1,0 +1,14 @@
+{
+  "industry": "retail",
+  "company": {
+    "name": "Harness",
+    "websiteUrl": "https://www.harness.io",
+    "tagline": "",
+    "logoUrl": "https://cdn.prod.website-files.com/6222ca42ea87e1bd1aa1d10c/62245acc1b2f1040941f0d8f_webclip.png"
+  },
+  "brand": {
+    "primary": "#0278D5",
+    "accent": "#00ADE4",
+    "dark": "#0B1727"
+  }
+}

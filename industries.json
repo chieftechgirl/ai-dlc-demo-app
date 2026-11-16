@@ -1,0 +1,65 @@
+{
+  "retail": {
+    "label": "Retail & E-commerce",
+    "tagline": "Ship storefront changes faster, with fewer rollbacks.",
+    "record": "Order",
+    "records": "Orders",
+    "statuses": ["Placed", "Packed", "Shipped", "Delivered"],
+    "kpis": ["Orders today", "Avg. fulfilment time", "Return rate"],
+    "samples": ["Order #1042 - Running shoes", "Order #1043 - Winter jacket", "Order #1044 - Gift card"]
+  },
+  "healthcare": {
+    "label": "Healthcare",
+    "tagline": "Deliver patient-facing software safely and compliantly.",
+    "record": "Case",
+    "records": "Cases",
+    "statuses": ["Intake", "In review", "Scheduled", "Closed"],
+    "kpis": ["Open cases", "Avg. time to schedule", "Compliance checks passed"],
+    "samples": ["Case 2201 - Referral intake", "Case 2202 - Lab result review", "Case 2203 - Follow-up visit"]
+  },
+  "financial-services": {
+    "label": "Financial Services",
+    "tagline": "Release with audit trails and governance built in.",
+    "record": "Request",
+    "records": "Requests",
+    "statuses": ["Submitted", "Risk check", "Approved", "Completed"],
+    "kpis": ["Requests today", "Avg. approval time", "Policy violations"],
+    "samples": ["Request 3101 - Wire transfer limit", "Request 3102 - New account", "Request 3103 - Card dispute"]
+  },
+  "insurance": {
+    "label": "Insurance",
+    "tagline": "Modernize claims and policy systems without the downtime.",
+    "record": "Claim",
+    "records": "Claims",
+    "statuses": ["Filed", "Assessing", "Approved", "Paid"],
+    "kpis": ["Open claims", "Avg. days to settle", "Fraud flags"],
+    "samples": ["Claim C-5001 - Auto collision", "Claim C-5002 - Water damage", "Claim C-5003 - Windshield"]
+  },
+  "manufacturing": {
+    "label": "Manufacturing",
+    "tagline": "Connect plant-floor software to a reliable delivery pipeline.",
+    "record": "Work order",
+    "records": "Work orders",
+    "statuses": ["Queued", "In production", "QA", "Shipped"],
+    "kpis": ["Active work orders", "Avg. cycle time", "Defect rate"],
+    "samples": ["WO-7001 - Gearbox housing", "WO-7002 - Sensor array", "WO-7003 - Control panel"]
+  },
+  "travel": {
+    "label": "Travel & Hospitality",
+    "tagline": "Keep booking systems fast through peak season.",
+    "record": "Booking",
+    "records": "Bookings",
+    "statuses": ["Requested", "Confirmed", "Checked in", "Completed"],
+    "kpis": ["Bookings today", "Avg. confirmation time", "Cancellation rate"],
+    "samples": ["Booking B-8801 - Lisbon, 3 nights", "Booking B-8802 - Tokyo, 7 nights", "Booking B-8803 - Denver, 2 nights"]
+  },
+  "technology": {
+    "label": "Software & Technology",
+    "tagline": "Ship features continuously and measure what matters.",
+    "record": "Ticket",
+    "records": "Tickets",
+    "statuses": ["Backlog", "In progress", "In review", "Released"],
+    "kpis": ["Open tickets", "Avg. lead time", "Change failure rate"],
+    "samples": ["Ticket 411 - Add SSO login", "Ticket 412 - Fix checkout latency", "Ticket 413 - Dark mode"]
+  }
+}
